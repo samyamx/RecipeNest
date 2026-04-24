@@ -72,6 +72,15 @@ export default function AddRecipePage() {
   }
 
   async function handleSubmit() {
+    const sessionRes = await fetch("/api/auth/session")
+    const sessionData = (await sessionRes.json().catch(() => null)) as { user?: { id: string } } | null
+
+    if (!sessionData?.user) {
+      toast.error("Please register to add recipes.")
+      router.push("/login")
+      return
+    }
+
     const payload = {
       category,
       cookTime,

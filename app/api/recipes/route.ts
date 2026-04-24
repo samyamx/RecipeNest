@@ -22,6 +22,11 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const currentUser = await getCurrentUser()
+
+    if (!currentUser) {
+      return NextResponse.json({ error: "You must be signed in to add a recipe." }, { status: 401 })
+    }
+
     const body = (await request.json()) as {
       author?: string
       category?: string
