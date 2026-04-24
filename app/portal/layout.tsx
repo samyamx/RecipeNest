@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { PortalSidebar } from "@/components/portal/portal-sidebar"
 import { getCurrentUser } from "@/lib/auth"
+import AccessDenied from "@/components/portal/access-denied"
 
 export const metadata = {
   title: "ChefPortal - Admin Dashboard",
@@ -18,6 +19,14 @@ export default async function PortalLayout({
 
   if (!user) {
     redirect("/login?next=/portal")
+  }
+
+  if (user.role !== "Chef" && user.role !== "Admin") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <AccessDenied />
+      </div>
+    )
   }
 
   return (

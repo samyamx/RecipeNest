@@ -110,7 +110,7 @@ export async function signUpUser(input: { email: string; name: string; password:
     location: "",
     name: input.name.trim(),
     passwordHash: hashPassword(input.password),
-    role: "Chef",
+    role: "User",
     status: "Active",
   }
 
