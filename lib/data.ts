@@ -12,6 +12,7 @@ export interface Recipe {
   author: string
   authorAvatar: string
   bookmarked: boolean
+  featured?: boolean
   ingredients: string[]
   steps: string[]
   createdAt: string

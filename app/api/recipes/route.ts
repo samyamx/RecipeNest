@@ -28,6 +28,7 @@ export async function POST(request: Request) {
       cookTime?: string
       description?: string
       difficulty?: "Easy" | "Medium" | "Hard"
+      featured?: boolean
       image?: string
       ingredients?: string[]
       servings?: number
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
       cookTime: body.cookTime,
       description: body.description,
       difficulty: body.difficulty,
+      featured: body.featured,
       image: uploadedImage,
       ingredients: body.ingredients,
       servings: Number(body.servings),

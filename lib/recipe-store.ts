@@ -20,6 +20,7 @@ type CreateRecipeInput = {
   cookTime: string
   description: string
   difficulty: Recipe["difficulty"]
+  featured?: boolean
   image?: string
   ingredients: string[]
   servings: number
@@ -151,6 +152,7 @@ export async function createRecipe(input: CreateRecipeInput) {
     author: input.author?.trim() || "Community Chef",
     authorAvatar: "",
     bookmarked: false,
+    featured: input.featured,
     ingredients: input.ingredients.map((item) => item.trim()).filter(Boolean),
     steps: input.steps.map((item) => item.trim()).filter(Boolean),
     createdAt: new Date().toISOString().slice(0, 10),
@@ -276,4 +278,45 @@ export async function getHomeStats() {
 export async function getSiteCategories() {
   const stats = await getCategoryStats()
   return ["All", ...stats.map((category) => category.name)]
+}
+
+export async function getDashboardStats() {
+  const recipes = await readRecipes()
+  const totalRecipes = recipes.length
+  const totalReviews = recipes.reduce((sum, recipe) => sum + recipe.reviews, 0)
+  const avgRating =
+    totalRecipes > 0
+      ? Number((recipes.reduce((sum, recipe) => sum + recipe.rating, 0) / totalRecipes).toFixed(1))
+      : 0
+
+  return { totalRecipes, totalReviews, avgRating }
+}
+
+export async function getMonthlyRecipeStats() {
+  const recipes = await readRecipes()
+
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+  const now = new Date()
+  const months: { month: string; recipes: number; views: number }[] = []
+
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push({
+      month: monthNames[d.getMonth()],
+      recipes: 0,
+      views: 0,
+    })
+  }
+
+  recipes.forEach((recipe) => {
+    const created = new Date(recipe.createdAt)
+    const label = monthNames[created.getMonth()]
+    const entry = months.find((m) => m.month === label)
+    if (entry) {
+      entry.recipes += 1
+      entry.views += recipe.reviews * 30 + Math.floor(recipe.rating * 50)
+    }
+  })
+
+  return months
 }

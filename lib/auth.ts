@@ -241,3 +241,43 @@ export async function listUsersWithRecipeCounts() {
 
   return enriched.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
+
+export async function getUserStats() {
+  const usersCollection = await getUsersCollection()
+  const users = await usersCollection.find({}, { projection: { createdAt: 1 } }).toArray()
+  const totalUsers = users.length
+
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const newUsersThisMonth = users.filter((u) => new Date(u.createdAt) >= startOfMonth).length
+
+  return { totalUsers, newUsersThisMonth }
+}
+
+export async function getMonthlyUserStats() {
+  const usersCollection = await getUsersCollection()
+  const users = await usersCollection.find({}, { projection: { createdAt: 1 } }).toArray()
+
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+  const now = new Date()
+  const months: { month: string; users: number }[] = []
+
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push({
+      month: monthNames[d.getMonth()],
+      users: 0,
+    })
+  }
+
+  users.forEach((user) => {
+    const created = new Date(user.createdAt)
+    const label = monthNames[created.getMonth()]
+    const entry = months.find((m) => m.month === label)
+    if (entry) {
+      entry.users += 1
+    }
+  })
+
+  return months
+}
