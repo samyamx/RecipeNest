@@ -320,3 +320,19 @@ export async function getMonthlyRecipeStats() {
 
   return months
 }
+
+export async function deleteRecipe(id: string) {
+  const collection = await ensureSeedData()
+
+  if (!collection) {
+    const existing = fallbackRecipes.find((recipe) => recipe.id === id)
+    if (!existing) {
+      return false
+    }
+    fallbackRecipes = fallbackRecipes.filter((recipe) => recipe.id !== id)
+    return true
+  }
+
+  const result = await collection.deleteOne({ id })
+  return result.deletedCount > 0
+}
