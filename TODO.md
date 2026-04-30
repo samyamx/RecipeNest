@@ -1,9 +1,6 @@
-# TODO: Make Dashboard Use Real Data
+# Fix MongoDB TLS Error on Windows 11
 
-- [x] Step 1: Add `getDashboardStats` and `getMonthlyRecipeStats` to `lib/recipe-store.ts`
-- [x] Step 2: Add `getUserStats` and `getMonthlyUserStats` to `lib/auth.ts`
-- [x] Step 3: Create `components/portal/dashboard-client.tsx` to receive real data as props
-- [x] Step 4: Update `app/portal/page.tsx` to fetch real data server-side
-- [x] Step 5: Update `app/portal/analytics/page.tsx` to use real category and monthly stats
-- [x] Step 6: Update `app/portal/categories/page.tsx` to use real category counts
-
+## Steps
+- [x] 1. Edit `lib/mongodb.ts` - add conditional TLS options to MongoClient
+- [x] 2. Edit `lib/auth.ts` - replace `getDatabase()` with `getDatabaseSafely()`, add null checks
+- [x] 3. Verify with TypeScript and production build

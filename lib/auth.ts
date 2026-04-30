@@ -2,7 +2,7 @@ import "server-only"
 
 import crypto from "crypto"
 import { cookies } from "next/headers"
-import { getDatabase } from "@/lib/mongodb"
+import { getDatabaseSafely } from "@/lib/mongodb"
 
 const usersCollectionName = "users"
 const sessionsCollectionName = "sessions"
@@ -66,14 +66,22 @@ function sanitizeUser(user: UserDocument): AppUser {
   }
 }
 
+function requireDatabaseCollection<T>(collection: T | null): T {
+  if (!collection) {
+    throw new Error("Database is unavailable.")
+  }
+
+  return collection
+}
+
 async function getUsersCollection() {
-  const db = await getDatabase()
-  return db.collection<UserDocument>(usersCollectionName)
+  const db = await getDatabaseSafely()
+  return db?.collection<UserDocument>(usersCollectionName) ?? null
 }
 
 async function getSessionsCollection() {
-  const db = await getDatabase()
-  return db.collection<SessionDocument>(sessionsCollectionName)
+  const db = await getDatabaseSafely()
+  return db?.collection<SessionDocument>(sessionsCollectionName) ?? null
 }
 
 async function setSessionCookie(token: string, expiresAt: Date) {
@@ -93,7 +101,7 @@ export async function clearSessionCookie() {
 }
 
 export async function signUpUser(input: { email: string; name: string; password: string }) {
-  const usersCollection = await getUsersCollection()
+  const usersCollection = requireDatabaseCollection(await getUsersCollection())
 
   const normalizedEmail = input.email.trim().toLowerCase()
   const existingUser = await usersCollection.findOne({ email: normalizedEmail })
@@ -119,7 +127,7 @@ export async function signUpUser(input: { email: string; name: string; password:
 }
 
 export async function updateCurrentUserProfile(input: { bio: string; location: string; name: string; userId: string }) {
-  const usersCollection = await getUsersCollection()
+  const usersCollection = requireDatabaseCollection(await getUsersCollection())
 
   const nextName = input.name.trim()
   const nextBio = input.bio.trim()
@@ -150,7 +158,7 @@ export async function updateCurrentUserProfile(input: { bio: string; location: s
 }
 
 export async function signInUser(input: { email: string; password: string }) {
-  const usersCollection = await getUsersCollection()
+  const usersCollection = requireDatabaseCollection(await getUsersCollection())
 
   const normalizedEmail = input.email.trim().toLowerCase()
   const user = await usersCollection.findOne({ email: normalizedEmail })
@@ -163,7 +171,7 @@ export async function signInUser(input: { email: string; password: string }) {
 }
 
 export async function createSession(userId: string) {
-  const sessionsCollection = await getSessionsCollection()
+  const sessionsCollection = requireDatabaseCollection(await getSessionsCollection())
 
   const token = crypto.randomBytes(32).toString("hex")
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
@@ -223,7 +231,11 @@ export async function getCurrentUser() {
 
 export async function listUsersWithRecipeCounts() {
   const usersCollection = await getUsersCollection()
-  const db = await getDatabase()
+  const db = await getDatabaseSafely()
+
+  if (!usersCollection || !db) {
+    return []
+  }
 
   const recipes = db.collection<{ author: string }>("recipes")
   const users = await usersCollection.find({}, { projection: { passwordHash: 0, _id: 0 } }).toArray()
@@ -244,6 +256,11 @@ export async function listUsersWithRecipeCounts() {
 
 export async function getUserStats() {
   const usersCollection = await getUsersCollection()
+
+  if (!usersCollection) {
+    return { totalUsers: 0, newUsersThisMonth: 0 }
+  }
+
   const users = await usersCollection.find({}, { projection: { createdAt: 1 } }).toArray()
   const totalUsers = users.length
 
@@ -256,8 +273,6 @@ export async function getUserStats() {
 
 export async function getMonthlyUserStats() {
   const usersCollection = await getUsersCollection()
-  const users = await usersCollection.find({}, { projection: { createdAt: 1 } }).toArray()
-
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
   const now = new Date()
   const months: { month: string; users: number }[] = []
@@ -269,6 +284,12 @@ export async function getMonthlyUserStats() {
       users: 0,
     })
   }
+
+  if (!usersCollection) {
+    return months
+  }
+
+  const users = await usersCollection.find({}, { projection: { createdAt: 1 } }).toArray()
 
   users.forEach((user) => {
     const created = new Date(user.createdAt)

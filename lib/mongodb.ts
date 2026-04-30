@@ -1,6 +1,6 @@
 import "server-only"
 
-import { MongoClient } from "mongodb"
+import { MongoClient, type MongoClientOptions } from "mongodb"
 
 declare global {
   var __mongoClientPromise__: Promise<MongoClient> | undefined
@@ -8,6 +8,9 @@ declare global {
 
 let client: MongoClient | undefined
 let clientPromise: Promise<MongoClient> | undefined
+let unavailableUntil = 0
+
+const retryAfterFailureMs = 30_000
 
 function resetClientState() {
   clientPromise = undefined
@@ -15,10 +18,39 @@ function resetClientState() {
   client = undefined
 }
 
+function shouldUseTls(uri: string) {
+  return uri.startsWith("mongodb+srv://") || /[?&](ssl|tls)=true(?:&|$)/i.test(uri)
+}
+
+function getConnectionOptions(uri: string): MongoClientOptions {
+  const options: MongoClientOptions = {
+    connectTimeoutMS: 2500,
+    serverSelectionTimeoutMS: 2500,
+    socketTimeoutMS: 5000,
+  }
+
+  if (shouldUseTls(uri)) {
+    options.tls = true
+
+    if (process.env.NODE_ENV === "development" && process.env.MONGODB_TLS_ALLOW_INVALID_CERTS === "true") {
+      options.tlsAllowInvalidCertificates = true
+      options.tlsAllowInvalidHostnames = true
+    }
+  }
+
+  return options
+}
+
+function describeConnectionError(error: unknown) {
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`
+  }
+
+  return "Unknown MongoDB connection error"
+}
+
 function createClientPromise(uri: string) {
-  const nextClient = new MongoClient(uri, {
-    serverSelectionTimeoutMS: 5000,
-  })
+  const nextClient = new MongoClient(uri, getConnectionOptions(uri))
 
   client = nextClient
 
@@ -60,6 +92,7 @@ function getClientPromise() {
 export async function getDatabase() {
   try {
     const connectedClient = await getClientPromise()
+    unavailableUntil = 0
     return connectedClient.db(process.env.MONGODB_DB || "recipe-nest")
   } catch (error) {
     resetClientState()
@@ -68,10 +101,19 @@ export async function getDatabase() {
 }
 
 export async function getDatabaseSafely() {
+  if (Date.now() < unavailableUntil) {
+    return null
+  }
+
   try {
     return await getDatabase()
   } catch (error) {
-    console.error("MongoDB connection failed. Falling back to local seed data.", error)
+    unavailableUntil = Date.now() + retryAfterFailureMs
+    console.warn(
+      `MongoDB connection failed. Falling back to local seed data for ${retryAfterFailureMs / 1000}s. ${describeConnectionError(
+        error
+      )}`
+    )
     return null
   }
 }
